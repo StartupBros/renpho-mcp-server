@@ -197,9 +197,9 @@ export class RenphoApiService {
       return cached;
     }
 
-    // API returns oldest first, so fetch all records when filtering by date
+    // API returns oldest first, so fetch more records when filtering by date
     // to ensure we get recent measurements, then apply limit after filtering
-    const fetchSize = lastAt ? 2000 : limit;
+    const fetchSize = lastAt ? Math.max(limit, 500) : limit;
 
     const measurementRequest = {
       pageNum: 1,
@@ -208,22 +208,36 @@ export class RenphoApiService {
       tableName: session.tableName
     };
 
-    const response = await fetch(`${API_BASE}/RenphoHealth/scale/queryAllMeasureDataList`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'token': session.token,
-        'userId': session.userId,
-        'appVersion': '7.0.0',
-        'platform': 'android'
-      },
-      body: JSON.stringify({ encryptData: this.encryptAES(JSON.stringify(measurementRequest)) })
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE}/RenphoHealth/scale/queryAllMeasureDataList`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'token': session.token,
+          'userId': session.userId,
+          'appVersion': '7.0.0',
+          'platform': 'android'
+        },
+        body: JSON.stringify({ encryptData: this.encryptAES(JSON.stringify(measurementRequest)) })
+      });
+    } catch (networkError) {
+      throw new Error(`Network error fetching measurements: ${(networkError as Error).message}`);
+    }
 
-    const responseJson = await response.json() as { code: number; msg: string; data: string };
+    let responseJson: { code: number; msg?: string; data?: string };
+    try {
+      responseJson = await response.json() as { code: number; msg?: string; data?: string };
+    } catch (parseError) {
+      throw new Error(`Failed to parse API response: ${(parseError as Error).message}, status: ${response.status}`);
+    }
 
     if (responseJson.code !== 101) {
-      throw new Error(`Failed to get measurements: ${responseJson.msg}`);
+      throw new Error(`Failed to get measurements: code=${responseJson.code}, msg=${responseJson.msg}, full=${JSON.stringify(responseJson)}`);
+    }
+
+    if (!responseJson.data) {
+      throw new Error('Failed to get measurements: No data in response');
     }
 
     const rawMeasurements = JSON.parse(this.decryptAES(responseJson.data)) as Array<Record<string, any>>;
