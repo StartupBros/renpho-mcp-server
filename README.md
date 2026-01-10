@@ -19,7 +19,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that pr
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/renpho-mcp-server.git
+git clone https://github.com/StartupBros/renpho-mcp-server.git
 cd renpho-mcp-server
 npm install
 npm run build
