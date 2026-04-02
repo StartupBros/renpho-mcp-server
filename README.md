@@ -7,7 +7,9 @@ A [Model Context Protocol](https://modelcontextprotocol.io) (MCP) server that pr
 - **Body Composition Data**: Weight, BMI, body fat %, muscle mass, water %, bone mass, visceral fat, metabolic age, BMR, and more
 - **Weight Trends**: Track changes over customizable time periods (7-365 days)
 - **Health Classifications**: Automatic BMI, body fat, and visceral fat category assessments
-- **Measurement History**: Access historical data with filtering options
+- **Measurement History**: Access historical measurements with date filtering
+- **Multi-table discovery**: Scans all linked Renpho scale tables instead of assuming the first discovered scale-user ID is always correct
+- **Sync diagnostics**: Inspect linked scale-user IDs, hidden measurements, and likely delayed Wi-Fi sync situations
 - **Secure**: Credentials stored as environment variables, never logged
 
 ## Requirements
@@ -76,11 +78,14 @@ Add to `claude_desktop_config.json`:
 
 | Tool | Description |
 |------|-------------|
-| `get_latest_measurement` | Most recent body composition reading |
+| `get_latest_measurement` | Most recent body composition reading selected for the current user |
 | `get_body_composition` | Detailed composition with health classifications |
 | `get_weight_trend` | Weight change analysis over N days |
 | `get_measurements` | Historical measurements with date filtering |
 | `get_current_user` | User profile information |
+| `get_scale_users` | Linked scale-user IDs and Renpho table mappings |
+| `get_sync_diagnostics` | Debug hidden/delayed measurements across linked scale users |
+| `refresh_data` | Clear caches and force a fresh Renpho session |
 | `health_check` | Verify API connection status |
 
 ## Example Usage
@@ -91,13 +96,22 @@ Once configured, ask Claude:
 - "Show my weight trend over the last 90 days"
 - "How has my body fat percentage changed this year?"
 - "Get my last 10 measurements"
+- "Show my Renpho scale user IDs"
+- "Run sync diagnostics for the last 7 days"
+- "Refresh Renpho data and re-check my latest measurement"
 
 ## Technical Notes
 
 - Uses the Renpho Health API (`cloud.renpho.com`), not the legacy API
 - Implements AES-128-ECB encryption for API communication
 - Handles JavaScript BigInt precision for large user IDs
+- Scans all discovered Renpho scale tables and scale-user IDs before selecting measurements for the current user
+- Includes a sync diagnostics tool to surface measurements associated with linked scale users but not currently selected for the logged-in user
 - Caches authentication tokens (50 min) and measurements (5 min) to reduce API calls
+
+## Known Wi-Fi Scale Sync Caveat
+
+Some Wi-Fi scales appear to upload measurements that are not immediately bound to the expected Renpho user until the mobile app performs additional sync logic. This server now helps debug that state with `get_scale_users`, `get_sync_diagnostics`, and `refresh_data`, but the exact server-side binding call used by the app is still being investigated.
 
 ## Privacy
 

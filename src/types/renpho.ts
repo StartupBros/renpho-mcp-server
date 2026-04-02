@@ -2,6 +2,8 @@ export interface RenphoUser {
   id: string;
   email: string;
   account_name?: string;
+  first_name?: string;
+  last_name?: string;
   birthday?: string;
   gender?: number;
   height?: number;
@@ -10,6 +12,9 @@ export interface RenphoUser {
   weight_goal?: number;
   locale?: string;
   area_code?: string;
+  measure_last_time?: string;
+  measure_last_weight?: string;
+  user_uuid?: string;
 }
 
 export interface RenphoMeasurement {
@@ -40,11 +45,16 @@ export interface RenphoMeasurement {
   method?: number;
   pregnant_flag?: number;
   sport_flag?: number;
+  is_auto?: number;
+  is_new?: boolean;
+  invalid_flag?: number;
 }
 
 export interface RenphoScaleUser {
   id: string;
   user_id: string;
+  table_name?: string;
+  count?: number;
   mac?: string;
   index?: number;
   key?: string;
@@ -56,6 +66,12 @@ export interface RenphoScaleUser {
   weight_goal?: number;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface RenphoScaleTable {
+  table_name: string;
+  user_ids: string[];
+  count: number;
 }
 
 export interface RenphoSession {
@@ -98,4 +114,14 @@ export interface RenphoBodyComposition {
     bodyfat_category: string;
     visceral_fat_category: string;
   };
+}
+
+export interface RenphoSyncDiagnostics {
+  user: RenphoUser;
+  family_members: RenphoUser[];
+  scale_tables: RenphoScaleTable[];
+  visible_latest_measurement: RenphoMeasurement | null;
+  latest_associated_measurement: RenphoMeasurement | null;
+  hidden_associated_measurements: RenphoMeasurement[];
+  latest_measurement_age_hours?: number;
 }

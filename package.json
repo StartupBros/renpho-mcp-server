@@ -1,6 +1,6 @@
 {
   "name": "renpho-mcp-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "MCP server for Renpho smart scale body composition data",
   "type": "module",
   "main": "dist/index.js",
@@ -11,6 +11,7 @@
     "build": "tsc && chmod +x dist/index.js",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
+    "test": "tsx --test test/**/*.test.ts",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
     "inspector": "npx @modelcontextprotocol/inspector dist/index.js"
