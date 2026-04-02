@@ -1,4 +1,11 @@
-import { RenphoMeasurement, RenphoBodyComposition, RenphoWeightTrend, RenphoUser } from '../types/renpho.js';
+import {
+  RenphoMeasurement,
+  RenphoBodyComposition,
+  RenphoWeightTrend,
+  RenphoUser,
+  RenphoScaleUser,
+  RenphoSyncDiagnostics
+} from '../types/renpho.js';
 
 export function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleDateString('en-US', {
@@ -11,10 +18,12 @@ export function formatDate(timestamp: number): string {
 }
 
 export function formatUser(user: RenphoUser): string {
-  let text = `User: ${user.account_name || user.email}\n`;
+  let text = `User: ${user.account_name || [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email}\n`;
   text += `Email: ${user.email}\n`;
   if (user.height) text += `Height: ${user.height} cm\n`;
   if (user.weight_goal) text += `Weight Goal: ${user.weight_goal} kg\n`;
+  if (user.measure_last_time) text += `App Last Measurement Time: ${user.measure_last_time}\n`;
+  if (user.measure_last_weight) text += `App Last Measurement Weight: ${user.measure_last_weight}\n`;
   return text;
 }
 
@@ -48,6 +57,13 @@ export function formatMeasurement(m: RenphoMeasurement): string {
     text += `- Heart Rate: ${m.heart_rate} bpm\n`;
     if (m.cardiac_index) text += `- Cardiac Index: ${m.cardiac_index}\n`;
   }
+
+  text += `\n**Source:**\n`;
+  if (m.user_id) text += `- Bound User ID: ${m.user_id}\n`;
+  if (m.scale_user_id) text += `- Scale User ID: ${m.scale_user_id}\n`;
+  if (m.method != null) text += `- Method: ${m.method}\n`;
+  if (m.is_auto != null) text += `- Auto Source Flag: ${m.is_auto}\n`;
+  if (m.is_new != null) text += `- New Flag: ${m.is_new ? 'true' : 'false'}\n`;
 
   return text;
 }
@@ -95,16 +111,75 @@ export function formatMeasurementList(measurements: RenphoMeasurement[]): string
   }
 
   let text = `**Recent Measurements (${measurements.length})**\n\n`;
-  text += `| Date | Weight | Body Fat | Muscle | BMI |\n`;
-  text += `|------|--------|----------|--------|-----|\n`;
+  text += `| Date | Weight | Body Fat | Muscle | BMI | Bound User | Scale User |\n`;
+  text += `|------|--------|----------|--------|-----|------------|------------|\n`;
 
   for (const m of measurements.slice(0, 20)) {
     const date = formatDate(m.time_stamp).split(',')[0];
-    text += `| ${date} | ${m.weight?.toFixed(1) || '-'} kg | ${m.bodyfat?.toFixed(1) || '-'}% | ${m.muscle?.toFixed(1) || '-'}% | ${m.bmi?.toFixed(1) || '-'} |\n`;
+    text += `| ${date} | ${m.weight?.toFixed(1) || '-'} kg | ${m.bodyfat?.toFixed(1) || '-'}% | ${m.muscle?.toFixed(1) || '-'}% | ${m.bmi?.toFixed(1) || '-'} | ${m.user_id || '-'} | ${m.scale_user_id || '-'} |\n`;
   }
 
   if (measurements.length > 20) {
     text += `\n...and ${measurements.length - 20} more measurements`;
+  }
+
+  return text;
+}
+
+export function formatScaleUsers(scaleUsers: RenphoScaleUser[]): string {
+  if (scaleUsers.length === 0) {
+    return 'No scale users found.';
+  }
+
+  let text = `**Scale Users (${scaleUsers.length})**\n\n`;
+  text += `| Scale User ID | Table | Count |\n`;
+  text += `|---------------|-------|-------|\n`;
+
+  for (const scaleUser of scaleUsers) {
+    text += `| ${scaleUser.user_id} | ${scaleUser.table_name || '-'} | ${scaleUser.count ?? '-'} |\n`;
+  }
+
+  return text;
+}
+
+export function formatSyncDiagnostics(diagnostics: RenphoSyncDiagnostics): string {
+  let text = `**Sync Diagnostics**\n\n`;
+  text += `Current user: ${diagnostics.user.account_name || diagnostics.user.email} (${diagnostics.user.id})\n`;
+  text += `Scale tables: ${diagnostics.scale_tables.length}\n`;
+  text += `Family members: ${diagnostics.family_members.length}\n`;
+
+  if (diagnostics.latest_measurement_age_hours != null) {
+    text += `Visible latest age: ${diagnostics.latest_measurement_age_hours.toFixed(1)} hours\n`;
+  }
+
+  text += `\n**Scale Tables**\n`;
+  for (const table of diagnostics.scale_tables) {
+    text += `- ${table.table_name}: ${table.count} records, userIds=[${table.user_ids.join(', ')}]\n`;
+  }
+
+  if (diagnostics.family_members.length > 0) {
+    text += `\n**Family Members**\n`;
+    for (const member of diagnostics.family_members) {
+      const name = member.account_name || [member.first_name, member.last_name].filter(Boolean).join(' ') || member.email || member.id;
+      text += `- ${name} (${member.id || 'unknown-id'})\n`;
+    }
+  }
+
+  text += `\n**Visible Latest Measurement**\n`;
+  text += diagnostics.visible_latest_measurement
+    ? `${formatMeasurement(diagnostics.visible_latest_measurement)}\n`
+    : 'No visible measurement found.\n';
+
+  text += `\n**Latest Associated Measurement Across All Linked Scale Users**\n`;
+  text += diagnostics.latest_associated_measurement
+    ? `${formatMeasurement(diagnostics.latest_associated_measurement)}\n`
+    : 'No associated measurements found.\n';
+
+  if (diagnostics.hidden_associated_measurements.length > 0) {
+    text += `\n**Associated Measurements Not Currently Selected For Current User**\n`;
+    for (const measurement of diagnostics.hidden_associated_measurements) {
+      text += `- ${formatDate(measurement.time_stamp)} | ${measurement.weight?.toFixed(1) || 'N/A'} kg | bound=${measurement.user_id || '-'} | scale=${measurement.scale_user_id || '-'}\n`;
+    }
   }
 
   return text;

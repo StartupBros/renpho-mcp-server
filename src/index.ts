@@ -11,7 +11,9 @@ import {
   formatMeasurement,
   formatBodyComposition,
   formatWeightTrend,
-  formatMeasurementList
+  formatMeasurementList,
+  formatScaleUsers,
+  formatSyncDiagnostics
 } from './utils/formatting.js';
 import { createLogger, format, transports } from 'winston';
 
@@ -34,7 +36,7 @@ const renphoApi = new RenphoApiService(config.email, config.password);
 
 const server = new McpServer({
   name: 'renpho-mcp-server',
-  version: '1.0.0'
+  version: '1.1.0'
 });
 
 server.tool(
@@ -51,6 +53,25 @@ server.tool(
       };
     } catch (error) {
       logger.error('Failed to get current user', { error: (error as Error).message });
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'get_scale_users',
+  'Get linked Renpho scale-user IDs and table mappings discovered from the account',
+  async () => {
+    try {
+      const scaleUsers = await renphoApi.getScaleUsers();
+      return {
+        content: [{
+          type: 'text' as const,
+          text: formatScaleUsers(scaleUsers)
+        }]
+      };
+    } catch (error) {
+      logger.error('Failed to get scale users', { error: (error as Error).message });
       throw error;
     }
   }
@@ -163,6 +184,47 @@ server.tool(
 );
 
 server.tool(
+  'get_sync_diagnostics',
+  {
+    days: z.number().min(1).max(30).default(7).describe('How many recent days to inspect for hidden or delayed measurements (default: 7)')
+  },
+  async ({ days }: { days: number }) => {
+    try {
+      const diagnostics = await renphoApi.getSyncDiagnostics(days);
+      return {
+        content: [{
+          type: 'text' as const,
+          text: formatSyncDiagnostics(diagnostics)
+        }]
+      };
+    } catch (error) {
+      logger.error('Failed to get sync diagnostics', { error: (error as Error).message, days });
+      throw error;
+    }
+  }
+);
+
+server.tool(
+  'refresh_data',
+  'Clear Renpho auth/measurement caches and re-fetch account state. Useful after taking a new measurement or after the mobile app syncs.',
+  async () => {
+    try {
+      renphoApi.invalidateCaches();
+      const user = await renphoApi.getCurrentUser();
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Renpho cache cleared and session refreshed for ${user.email}.`
+        }]
+      };
+    } catch (error) {
+      logger.error('Failed to refresh data', { error: (error as Error).message });
+      throw error;
+    }
+  }
+);
+
+server.tool(
   'health_check',
   'Check the health status of the Renpho MCP server and API connection',
   async () => {
@@ -171,7 +233,7 @@ server.tool(
       return {
         content: [{
           type: 'text' as const,
-          text: `Renpho MCP Server Health Check\n\nStatus: Healthy\nTimestamp: ${new Date().toISOString()}\nAPI Connection: OK\nUser: ${user.email}\nVersion: 1.0.0`
+          text: `Renpho MCP Server Health Check\n\nStatus: Healthy\nTimestamp: ${new Date().toISOString()}\nAPI Connection: OK\nUser: ${user.email}\nVersion: 1.1.0`
         }]
       };
     } catch (error) {
