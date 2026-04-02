@@ -89,6 +89,11 @@ export class RenphoApiService {
     return match ? match[1] : null;
   }
 
+  private extractIdsAsStrings(json: string, key: string): string[] {
+    const regex = new RegExp(`"${key}":(\\d+)`, 'g');
+    return Array.from(json.matchAll(regex), match => match[1]);
+  }
+
   // Extract all userIds arrays as string arrays to avoid precision loss
   private extractUserIdGroupsAsStrings(json: string): string[][] {
     const matches = json.matchAll(/"userIds":\[(\d+(?:,\d+)*)\]/g);
@@ -307,7 +312,7 @@ export class RenphoApiService {
     pageNum: number,
     pageSize: number
   ): Promise<Array<Record<string, any>>> {
-    return await this.postEncrypted<Array<Record<string, any>>>(
+    const rawResponse = await this.postEncryptedRaw(
       'RenphoHealth/scale/queryAllMeasureDataList',
       session,
       {
@@ -317,6 +322,18 @@ export class RenphoApiService {
         tableName
       }
     );
+
+    const parsed = JSON.parse(rawResponse) as Array<Record<string, any>>;
+    const ids = this.extractIdsAsStrings(rawResponse, 'id');
+    const boundUserIds = this.extractIdsAsStrings(rawResponse, 'bUserId');
+    const scaleUserIds = this.extractIdsAsStrings(rawResponse, 'subUserId');
+
+    return parsed.map((entry, index) => ({
+      ...entry,
+      __idString: ids[index] || (entry.id != null ? String(entry.id) : undefined),
+      __bUserIdString: boundUserIds[index] || (entry.bUserId != null ? String(entry.bUserId) : undefined),
+      __subUserIdString: scaleUserIds[index] || (entry.subUserId != null ? String(entry.subUserId) : undefined)
+    }));
   }
 
   private async fetchMeasurementsForTable(
@@ -362,7 +379,7 @@ export class RenphoApiService {
 
   private mapMeasurement(m: Record<string, any>): RenphoMeasurement {
     return {
-      id: String(m.id),
+      id: m.__idString || String(m.id),
       time_stamp: Number(m.timeStamp),
       weight: m.weight,
       bmi: m.bmi,
@@ -381,8 +398,8 @@ export class RenphoApiService {
       resistance: m.resistance,
       fat_free_weight: m.fatFreeWeight,
       metabolic_age: m.bodyage,
-      user_id: m.bUserId != null ? String(m.bUserId) : undefined,
-      scale_user_id: m.subUserId != null ? String(m.subUserId) : undefined,
+      user_id: m.__bUserIdString || (m.bUserId != null ? String(m.bUserId) : undefined),
+      scale_user_id: m.__subUserIdString || (m.subUserId != null ? String(m.subUserId) : undefined),
       mac: m.mac,
       internal_model: m.internalModel,
       scale_name: m.scaleName,

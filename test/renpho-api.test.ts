@@ -92,7 +92,19 @@ test('getMeasurements falls back to the only scale user when measurements are no
   assert.equal(measurements[0].id, 'pending-bind');
 });
 
-test('fetchMeasurementsForTable pulls newest pages first when filtering by recent timestamps', async () => {
+test('fetchMeasurementPage preserves big integer ids as strings', async () => {
+  const service = createService() as any;
+  service.postEncryptedRaw = async () => '[{"id":5919278420902642176,"timeStamp":1771059525,"bUserId":5245536005636456320,"subUserId":5245536005636456320,"weight":88.15}]';
+
+  const page = await service.fetchMeasurementPage(createSession(), 'table_a', ['scale-1'], 1, 50);
+  const mapped = service.mapMeasurement(page[0]);
+
+  assert.equal(mapped.id, '5919278420902642176');
+  assert.equal(mapped.user_id, '5245536005636456320');
+  assert.equal(mapped.scale_user_id, '5245536005636456320');
+});
+
+test('fetchMeasurementsForTable pulls newest pages first when filtering recent timestamps', async () => {
   const service = createService() as any;
   const pagesVisited: number[] = [];
   service.fetchMeasurementPage = async (
